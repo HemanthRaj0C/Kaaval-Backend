@@ -1,0 +1,50 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.pickle
+*.cache
+
+# --- Virtual Environment ---
+venv/
+.env/
+*.env
+
+# --- Build / Dist ---
+build/
+dist/
+*.egg-info/
+
+# --- Logs ---
+*.log
+logs/
+debug.log
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+
+# --- Data & Embeddings ---
+data/raw/
+data/aligned/
+data/embeddings/
+data/index.faiss
+*.npy
+*.npz
+
+# --- Model Downloads (InsightFace) ---
+.insightface/
+models/
+checkpoints/
+
+# --- Uploaded Temp Files (API) ---
+uploads/
+temp/
+tmp/
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db
