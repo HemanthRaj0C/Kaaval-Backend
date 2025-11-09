@@ -3,7 +3,8 @@ import numpy as np
 import os
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from insightface.app import FaceAnalysis
 from insightface.utils.face_align import norm_crop
@@ -65,10 +66,32 @@ async def match_face(file: UploadFile = File(...)):
 
     return {
         "matches": [
-            {"filename": filename, "similarity": float(sim)}
+            {
+                "filename": filename, 
+                "similarity": float(sim),
+                "imageUrl": f"/api/image/{filename.replace('.npy', '.jpg')}"
+            }
             for filename, sim in results
         ]
     }
+
+
+@app.get("/api/image/{filename}")
+async def serve_image(filename: str):
+    """Serve original images from data/raw folder"""
+    try:
+        # Clean the filename - remove .npy if present and ensure .jpg extension
+        clean_filename = filename.replace('.npy', '').replace('.jpg', '') + '.jpg'
+        
+        RAW_DIR = "backend/data/raw"
+        image_path = os.path.join(RAW_DIR, clean_filename)
+        
+        if not os.path.exists(image_path):
+            raise HTTPException(status_code=404, detail=f"Image not found: {clean_filename}")
+        
+        return FileResponse(image_path, media_type="image/jpeg")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/stats")
