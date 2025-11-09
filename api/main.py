@@ -1,14 +1,16 @@
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, UploadFile
+import os
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from insightface.app import FaceAnalysis
 from insightface.utils.face_align import norm_crop
 
 # ✅ Use fusion embedding instead of normal embedding
 from backend.src.modules.fusion import fusion_embedding
-from backend.src.modules.matcher import search
+from backend.src.modules.matcher import search, load_embeddings
 
 app = FastAPI()
 
@@ -67,3 +69,96 @@ async def match_face(file: UploadFile = File(...)):
             for filename, sim in results
         ]
     }
+
+
+@app.get("/stats")
+async def get_stats():
+    """Get database statistics"""
+    try:
+        # Count embeddings
+        EMB_DIR = "backend/data/embeddings"
+        ALIGNED_DIR = "backend/data/aligned"
+        RAW_DIR = "backend/data/raw"
+        
+        emb_count = len([f for f in os.listdir(EMB_DIR) if f.endswith('.npy')]) if os.path.exists(EMB_DIR) else 0
+        aligned_count = len([f for f in os.listdir(ALIGNED_DIR) if f.endswith('.jpg')]) if os.path.exists(ALIGNED_DIR) else 0
+        raw_count = len([f for f in os.listdir(RAW_DIR) if f.endswith('.jpg')]) if os.path.exists(RAW_DIR) else 0
+        
+        return {
+            "embeddings": emb_count,
+            "aligned_faces": aligned_count,
+            "raw_images": raw_count,
+            "total_database": emb_count
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/database/files")
+async def get_database_files(limit: int = 50):
+    """Get list of files in database"""
+    try:
+        EMB_DIR = "backend/data/embeddings"
+        files = [f.replace('.npy', '') for f in os.listdir(EMB_DIR) if f.endswith('.npy')]
+        return {
+            "files": files[:limit],
+            "total": len(files)
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "model": "buffalo_l",
+        "embedding_dim": 512
+    }
+
+
+@app.post("/training/preprocess")
+async def run_preprocess():
+    """Run face detection and alignment on raw images"""
+    try:
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, "backend/src/scripts/preprocess.py"],
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minute timeout
+        )
+        return {
+            "status": "completed" if result.returncode == 0 else "failed",
+            "output": result.stdout,
+            "error": result.stderr if result.returncode != 0 else None
+        }
+    except subprocess.TimeoutExpired:
+        return {"status": "failed", "error": "Process timed out after 5 minutes"}
+    except Exception as e:
+        return {"status": "failed", "error": str(e)}
+
+
+@app.post("/training/embed")
+async def run_embedding():
+    """Generate embeddings from aligned faces"""
+    try:
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, "backend/src/scripts/batchEmbed.py"],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minute timeout
+        )
+        return {
+            "status": "completed" if result.returncode == 0 else "failed",
+            "output": result.stdout,
+            "error": result.stderr if result.returncode != 0 else None
+        }
+    except subprocess.TimeoutExpired:
+        return {"status": "failed", "error": "Process timed out after 10 minutes"}
+    except Exception as e:
+        return {"status": "failed", "error": str(e)}

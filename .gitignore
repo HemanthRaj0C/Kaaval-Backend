@@ -29,6 +29,7 @@ debug.log
 
 # --- Data & Embeddings ---
 data/raw/
+data/damaged/
 data/aligned/
 data/embeddings/
 data/index.faiss
